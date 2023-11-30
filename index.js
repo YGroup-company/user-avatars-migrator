@@ -24,7 +24,7 @@ await pgClient.connect();
 console.log("\x1b[33m%s\x1b[0m", `PG_HOST: ${process.env.PG_HOST}`);
 
 await pgClient.query(
-  `CREATE TABLE IF NOT EXISTS images_to_process (
+  `CREATE TABLE IF NOT EXISTS user_avatars_to_process (
     id serial PRIMARY KEY,
     image_url TEXT NOT NULL,
     image_key TEXT NOT NULL
@@ -40,14 +40,14 @@ const s3 = new S3Client({
   },
 });
 
-const json = await readFile("./posts.json", "utf8");
+const json = await readFile("./users.json", "utf8");
 const { data } = JSON.parse(json);
 
 let imageUrls = [];
-for (const post of Object.values(data)) {
-  const { list_images } = post;
-  if (list_images) {
-    imageUrls = imageUrls.concat(list_images);
+for (const user of Object.values(data)) {
+  const { photo_url } = user;
+  if (photo_url) {
+    imageUrls.push(photo_url);
   }
 }
 
@@ -61,7 +61,7 @@ let httpsGetPromise = function (src) {
 
 for (const imageUrl of imageUrls) {
   console.log("start downloading");
-  const exitsingRecord = await pgClient.query("SELECT * FROM images_to_process WHERE image_url = $1", [imageUrl]);
+  const exitsingRecord = await pgClient.query("SELECT * FROM user_avatars_to_process WHERE image_url = $1", [imageUrl]);
   if (exitsingRecord.rows.length) {
     console.log("skipping");
     continue;
@@ -75,15 +75,15 @@ for (const imageUrl of imageUrls) {
     ContentLength: response.headers["content-length"],
     ContentType: response.headers["content-type"],
     Bucket: process.env.S3_BUCKET,
-    Key: `facility/images/${newImageUuid}.${response.headers["content-type"].split("/").pop()}`,
+    Key: `user/profile-images/${newImageUuid}.${response.headers["content-type"].split("/").pop()}`,
     Body: response,
   });
 
   await s3.send(uploadInput);
 
-  await pgClient.query("INSERT INTO images_to_process (image_url, image_key) VALUES ($1, $2)", [
+  await pgClient.query("INSERT INTO user_avatars_to_process (image_url, image_key) VALUES ($1, $2)", [
     imageUrl,
-    `facility/images/${newImageUuid}.${response.headers["content-type"].split("/").pop()}`,
+    `user/profile-images/${newImageUuid}.${response.headers["content-type"].split("/").pop()}`,
   ]);
   console.log("ended downloading");
 }
