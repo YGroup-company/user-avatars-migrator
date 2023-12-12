@@ -43,13 +43,22 @@ const s3 = new S3Client({
 const json = await readFile("./users.json", "utf8");
 const { data } = JSON.parse(json);
 
+const alreadyProcessed = await readFile("./profile-image-url-to-s3-key-object.json", "utf8");
+const alreadyProcessedObject = JSON.parse(alreadyProcessed);
+
 let imageUrls = [];
+const alreadyProcessedUrls = Object.keys(alreadyProcessedObject);
 for (const user of Object.values(data)) {
   const { photo_url } = user;
   if (photo_url) {
+    if (alreadyProcessedUrls.includes(photo_url)) {
+      continue;
+    }
     imageUrls.push(photo_url);
   }
 }
+
+console.log(imageUrls.length);
 
 let httpsGetPromise = function (src) {
   return new Promise((resolve, reject) => {
